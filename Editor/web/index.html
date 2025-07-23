@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🎬 Video Timeline Editor</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="container">
+
+    <div class="header">
+        <div class="theme‑toggle">
+            <input type="checkbox" id="themeSwitch" />
+            <label for="themeSwitch" title="Toggle light / dark">🌙</label>
+        </div>
+
+        <h1>🎬 Video Timeline Editor</h1>
+        <p>Create multiple video timelines and export them with custom names</p>
+    </div>
+
+    <div class="main-content">
+        <!-- ---------- SIDEBAR ---------- -->
+        <div class="sidebar">
+            <div class="section-title">📁 Video Library</div>
+
+            <button class="browse-btn" onclick="selectSource()">📂 Select Source Folder</button>
+            <p id="srcLabel" class="path-label">None selected</p>
+
+            <div class="video-list" id="videoList">
+                <div class="empty-state">Click “Select Source Folder” to load video files</div>
+            </div>
+
+            <div class="section-title" style="margin-top:20px;">⚙️ Export Settings</div>
+
+            <button class="browse-btn" onclick="selectDestination()">📁 Select Destination Folder</button>
+            <p id="dstLabel" class="path-label">None selected</p>
+
+            <button class="export-btn" id="exportBtn" onclick="exportTimelines()">🚀 Export All Timelines</button>
+
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p id="progressText" class="progress-info"></p>
+            <p id="etaText" class="progress-info eta"></p>
+
+            <div class="status-message" id="statusMessage"></div>
+        </div>
+
+        <!-- ---------- MAIN PANEL ---------- -->
+        <div class="main-panel">
+            <div class="section-title">🎞️ Video Timelines</div>
+            <button class="add-timeline-btn" onclick="addTimeline()">➕ Add New Timeline</button>
+
+            <div id="timelinesContainer">
+                <div class="empty-state">Click “Add New Timeline” to create your first video timeline</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/eel.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
