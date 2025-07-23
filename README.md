@@ -7,11 +7,6 @@
 
 Drag‑and‑drop desktop app that turns loose clips into ready‑to‑upload videos.
 
-<table>
-<tr><td align="center"><img src="docs/screenshot-light.png" width="400"></td>
-<td align="center"><img src="docs/screenshot-dark.png"  width="400"></td></tr>
-<tr><td colspan="2" align="center">Light &amp; Dark themes • multi‑timeline • live progress</td></tr>
-</table>
 
 ## ✨ Features
 
