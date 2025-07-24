@@ -17,6 +17,7 @@
 
         <h1>🎬 Video Timeline Editor</h1>
         <p>Create multiple video timelines and export them with custom names</p>
+        <div id="systemInfo" class="system-info"></div>
     </div>
 
     <div class="main-content">
@@ -28,7 +29,7 @@
             <p id="srcLabel" class="path-label">None selected</p>
 
             <div class="video-list" id="videoList">
-                <div class="empty-state">Click “Select Source Folder” to load video files</div>
+                <div class="empty-state">Click "Select Source Folder" to load video files</div>
             </div>
 
             <div class="section-title" style="margin-top:20px;">⚙️ Export Settings</div>
@@ -53,7 +54,7 @@
             <button class="add-timeline-btn" onclick="addTimeline()">➕ Add New Timeline</button>
 
             <div id="timelinesContainer">
-                <div class="empty-state">Click “Add New Timeline” to create your first video timeline</div>
+                <div class="empty-state">Click "Add New Timeline" to create your first video timeline</div>
             </div>
         </div>
     </div>
@@ -61,5 +62,16 @@
 
 <script src="/eel.js"></script>
 <script src="app.js"></script>
+<script>
+// Display system info on load
+window.addEventListener("load", () => {
+    eel.get_system_info()((info) => {
+        const systemInfo = document.getElementById('systemInfo');
+        const icon = info.gpu_acceleration ? '🎮' : '💻';
+        systemInfo.innerHTML = `${icon} ${info.encoder_name}`;
+        systemInfo.className = 'system-info ' + (info.gpu_acceleration ? 'gpu-enabled' : 'cpu-mode');
+    });
+});
+</script>
 </body>
 </html>

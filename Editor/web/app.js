@@ -44,15 +44,43 @@ function displayVideos(){
         return;
     }
     list.innerHTML = videos.map(v=>`
-        <div class="video-item" draggable="true"
-             data-video-name="${v.name}" data-video-path="${v.path}">
-            <span class="video-icon">🎥</span>
-            <div>
-              <div style="font-weight:bold">${v.name}</div>
-              <div style="font-size:12px" class="file-size">${v.size}</div>
+        <div class="video-item-container">
+            <div class="video-item" draggable="true"
+                 data-video-name="${v.name}" data-video-path="${v.path}">
+                <span class="video-icon">🎥</span>
+                <div class="video-info">
+                  <div style="font-weight:bold">${v.name}</div>
+                  <div style="font-size:12px" class="file-size">${v.size}</div>
+                </div>
             </div>
+            <button class="add-to-all-btn" onclick="addVideoToAllTimelines('${v.name}','${v.path}')" 
+                    title="Add to all timelines">📋+</button>
         </div>`).join('');
     list.querySelectorAll('.video-item').forEach(i=>i.addEventListener('dragstart',handleDragStart));
+}
+
+/* ---------- ADD TO ALL TIMELINES ---------- */
+function addVideoToAllTimelines(name, path){
+    if(!timelines.length){
+        showStatus("No timelines available. Create a timeline first.","error");
+        return;
+    }
+    
+    let addedCount = 0;
+    timelines.forEach(tl => {
+        // Check if video already exists in this timeline
+        if(!tl.videos.some(v => v.path === path)){
+            tl.videos.push({name: name, path: path});
+            addedCount++;
+        }
+    });
+    
+    if(addedCount > 0){
+        renderTimelines();
+        showStatus(`Added "${name}" to ${addedCount} timeline(s)`,"success");
+    } else {
+        showStatus(`"${name}" already exists in all timelines`,"error");
+    }
 }
 
 /* ---------- TIMELINE CRUD ---------- */
@@ -79,7 +107,7 @@ function updateTimelineName(id,n){
 function renderTimelines(){
     const c = document.getElementById("timelinesContainer");
     if(!timelines.length){
-        c.innerHTML = '<div class="empty-state">Click “Add New Timeline” to create your first video timeline</div>';
+        c.innerHTML = '<div class="empty-state">Click "Add New Timeline" to create your first video timeline</div>';
         return;
     }
 
@@ -213,7 +241,7 @@ eel.expose(start_timeline);
 function start_timeline(name){
     document.getElementById("progressFill").style.width = "0%";
     document.getElementById("progressBar").style.display = "block";
-    document.getElementById("progressText").textContent = `Processing: ${name} • 0 %`;
+    document.getElementById("progressText").textContent = `Processing: ${name} • 0 %`;
     document.getElementById("etaText").textContent = "ETA: calculating…";
 }
 
@@ -227,7 +255,7 @@ function update_progress(percent, tlName, etaSec){
     const s = String(Math.floor(etaSec%60)).padStart(2,"0");
 
     document.getElementById("progressText").textContent =
-        `Processing: ${tlName}  •  ${percent.toFixed(1)} %`;
+        `Processing: ${tlName}  •  ${percent.toFixed(1)} %`;
     document.getElementById("etaText").textContent =
         `ETA: ${h}:${m}:${s}`;
 }
@@ -245,4 +273,12 @@ function showStatus(msg,type){
 window.addEventListener("load", ()=>{
     initTheme();
     addTimeline();
+    
+    // Load system info
+    eel.get_system_info()((info) => {
+        const systemInfo = document.getElementById('systemInfo');
+        const icon = info.gpu_acceleration ? '🎮' : '💻';
+        systemInfo.innerHTML = `${icon} ${info.encoder_name}`;
+        systemInfo.className = 'system-info ' + (info.gpu_acceleration ? 'gpu-enabled' : 'cpu-mode');
+    });
 });
