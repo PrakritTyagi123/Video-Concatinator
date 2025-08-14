@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Video Timeline Editor – backend
+Video Timeline Editor backend
 ✓ Writes AV1 in an MKV container
 ✓ Auto-detects the best available GPU encoder (AV1 → H.264 → CPU)
 ✓ Streams live progress updates to the Eel front-end
@@ -15,7 +15,7 @@ import eel
 warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
 eel.init("web", allowed_extensions=[".js", ".html", ".css"])
 
-VIDEO_EXT = (".mp4", ".mov", ".mkv", ".avi", ".flv", ".webm")
+VIDEO_EXT = (".mp4", ".mov", ".mkv", ".avi", ".flv", ".webm", ".ts")
 
 # --------------------------------------------------------------------------- #
 #  GPU / codec detection
