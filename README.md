@@ -1,105 +1,187 @@
-
 # 🎬 Video Timeline Editor
 
-*A lightweight, desktop‑friendly tool for assembling and exporting one‑or‑many video timelines.*
+A desktop application for creating and exporting multiple video timelines with GPU-accelerated encoding.
 
-Drag clips in, reorder on the fly, and export in ultra‑fast **copy** mode *or* full **GPU‑accelerated re‑encode**—no NLE bloat and no command‑line gymnastics.
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
+![FFmpeg](https://img.shields.io/badge/FFmpeg-Required-green.svg)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
----
+## Features
 
-## ✨ Key Features
+- **Multiple Timelines** – Create, rename, and manage multiple video timelines simultaneously
+- **Drag & Drop** – Intuitive drag-and-drop interface for adding and reordering clips
+- **GPU Acceleration** – Auto-detects and uses the best available encoder (NVIDIA, AMD, Intel, Apple)
+- **Smart Export** – Automatically chooses between fast concat (copy) or re-encoding based on source formats
+- **Live Progress** – Real-time progress bar with ETA during export
+- **Dark/Light Theme** – Toggle between themes with preference saved locally
 
-| Capability | Details |
-|------------|---------|
-| **Automatic GPU detection** | Picks the best available encoder (NVENC / AMF / VideoToolbox, falling back to libx264). |
-| **Smart export pipeline** | • **Copy‑fast** if every clip already matches container+codec  <br>• **GPU re‑encode** when codecs/resolutions differ. |
-| **Drag‑and‑drop timeline builder** | Add clips from the library, reorder, or duplicate between timelines using intuitive HTML5 DnD. |
-| **Multiple parallel timelines** | Create as many timelines as you want; export all with one click. |
-| **Light / Dark theme toggle** | Persists in `localStorage`—perfect for night sessions. |
-| **Live progress & ETA** | FFmpeg `‑progress` is parsed and streamed to the UI so you always know where you stand. |
-| **Bulk “Add to all timelines”** | Great for universal intros/outros. |
-| **Zero‑install front‑end** | Bundled with [Eel](https://github.com/ChrisKnott/Eel); launches in Chrome on Windows or system browser elsewhere. |
+## Supported Encoders
 
----
+The application automatically detects and uses the best available encoder in this priority order:
 
-## 📦 Prerequisites
+| Priority | Encoder | Description |
+|----------|---------|-------------|
+| 1 | `av1_nvenc` | NVIDIA AV1 |
+| 2 | `av1_qsv` | Intel QuickSync AV1 |
+| 3 | `av1_amf` | AMD AV1 |
+| 4 | `av1_videotoolbox` | Apple VideoToolbox AV1 |
+| 5 | `libaom-av1` | CPU AV1 (software) |
+| 6 | `h264_nvenc` | NVIDIA H.264 |
+| 7 | `h264_amf` | AMD H.264 |
+| 8 | `h264_videotoolbox` | Apple H.264 |
+| 9 | `libx264` | CPU H.264 (fallback) |
 
-| Requirement | Notes |
-|-------------|-------|
-| **Python 3.9 +** | Tested on 3.11. |
-| **FFmpeg (static build)** | Must include NVENC/AMF/VideoToolbox if you want GPU encode. |
-| **NVIDIA / AMD / Apple drivers** | Match your FFmpeg build for hardware‑encode support. |
-| **Google Chrome** (Windows only) | Eel opens in Chrome for best ES6 / CSS support. |
+## Requirements
 
----
+### System Requirements
 
-## 🚀 Quick Start
+- **Python** 3.10 or higher
+- **FFmpeg** (must be in system PATH)
+- **Google Chrome** (recommended) or any Chromium-based browser
+
+### Python Dependencies
 
 ```bash
-git clone https://github.com/<your‑user>/video‑timeline‑editor.git
-cd video‑timeline‑editor
+pip install eel
+```
 
-python -m venv .venv
-# PowerShell
-.venv\Scripts\Activate.ps1
-# or bash
-source .venv/bin/activate
+## Installation
 
-pip install -r requirements.txt      # eel, tqdm, ffmpeg‑progress, etc.
+1. **Clone or download** the project files
+
+2. **Ensure folder structure:**
+   ```
+   video-timeline-editor/
+   ├── main.py
+   └── web/
+       ├── index.html
+       ├── app.js
+       └── styles.css
+   ```
+
+3. **Install FFmpeg:**
+   - **Windows:** Download from [ffmpeg.org](https://ffmpeg.org/download.html), extract, and add `bin` folder to PATH
+   - **macOS:** `brew install ffmpeg`
+   - **Linux:** `sudo apt install ffmpeg`
+
+4. **Install Python dependencies:**
+   ```bash
+   pip install eel
+   ```
+
+## Usage
+
+### Starting the Application
+
+```bash
+cd video-timeline-editor
 python main.py
 ```
 
-1. **Select Source Folder** – loads every `.mp4`, `.mkv`, etc. in one go.  
-2. **Drag clips** from the library onto a timeline (create more timelines as needed).  
-3. **Pick Destination Folder**.  
-4. Hit **🚀 Export All Timelines**.  
-   *If clips share container *and* codec the app “copy‑fast” concatenates them; otherwise it re‑encodes using the detected GPU encoder.*
+The application will:
+1. Detect available GPU encoders
+2. Open a Chrome window with the UI
+3. Display the detected encoder in the console
 
----
+### Workflow
 
-## 🛠 Advanced Options
+1. **Select Source Folder** – Click to choose a folder containing video files
+2. **Create Timelines** – Click "Add New Timeline" to create timelines
+3. **Add Videos** – Drag videos from the library to timelines, or use the "+All" button
+4. **Reorder Clips** – Drag clips within or between timelines to reorder
+5. **Select Destination** – Choose where to save exported files
+6. **Export** – Click "Export All Timelines" to render
 
-| Trick | How |
-|-------|-----|
-| **Force re‑encode** | Pass `--force` flag (coming soon) or add a UI checkbox; forces the GPU branch even when copy‑fast is possible. |
-| **Custom NVENC bitrate** | Edit the `cmd.extend([...])` block in `exporter.py::_export_with_reencoding`. |
-| **Package into a single EXE / App** | `pip install pyinstaller` then `pyinstaller --onefile main.py` (ship the `web/` folder and FFmpeg DLLs alongside). |
-| **Disable GPU** | Start with environment variable `VTE_CPU=1` to bypass GPU detection. |
+### Supported Video Formats
 
----
+`.mp4`, `.mov`, `.mkv`, `.avi`, `.flv`, `.webm`, `.ts`
 
-## 🐛 Troubleshooting
+## Project Structure
 
-| Symptom | Possible Fix |
-|---------|--------------|
-| **“Missing files detected”** | Paths in the timeline no longer exist—remove and re‑add the clips. |
-| **GPU encoder not used** | The export fell back to copy‑fast because every clip already matched container+codec; force a re‑encode to exercise the GPU. |
-| **No progress bar** | Ensure you’re running FFmpeg ≥ 3.1 (adds `‑progress pipe:1`). |
+```
+video-timeline-editor/
+├── main.py          # Python backend (Eel server, FFmpeg processing)
+└── web/
+    ├── index.html   # HTML structure
+    ├── app.js       # Frontend JavaScript (state, drag-drop, UI logic)
+    └── styles.css   # Styling with light/dark theme support
+```
 
----
+### File Descriptions
 
-## 🗺 Roadmap
+| File | Description |
+|------|-------------|
+| `main.py` | Backend server using Eel framework. Handles file dialogs, GPU detection, FFmpeg encoding, and progress streaming. |
+| `index.html` | Main HTML template with sidebar (source/destination pickers, export controls) and main panel (timelines). |
+| `app.js` | Frontend logic including state management, drag-and-drop handling, theme toggle, and Eel communication. |
+| `styles.css` | Complete styling with CSS variables, animations, and full dark theme support. |
 
-- Waveform & VU‑meter overlay  
-- Undo/redo stack  
-- Basic audio ducking  
-- Render presets (YouTube 4K, Twitch 1080p60, etc.)  
-- One‑click installer  
+## API Reference
 
----
+### Python → JavaScript (Exposed Functions)
 
-## 🤝 Contributing
+| Function | Description |
+|----------|-------------|
+| `choose_source()` | Opens folder picker, returns `{path, files[]}` |
+| `choose_destination()` | Opens folder picker, returns path string |
+| `export_timelines(json, path)` | Exports timelines to specified directory |
+| `get_system_info()` | Returns encoder info and GPU status |
 
-1. Fork → feature branch → PR.  
-2. Follow PEP‑8; run `ruff .` before committing.  
-3. Large UI changes? Attach a short screen‑cap GIF (link only, no images in the repo).
+### JavaScript → Python (Eel Callbacks)
 
----
+| Function | Description |
+|----------|-------------|
+| `start_timeline(name)` | Called when a timeline export begins |
+| `update_progress(percent, name, eta)` | Called with progress updates during export |
 
-## 📄 License
+## Export Behavior
 
-[MIT](LICENSE)
+### Fast Mode (Stream Copy)
+When all clips in a timeline share the same format, the app uses FFmpeg's concat demuxer with stream copy (`-c copy`). This is:
+- ⚡ Extremely fast
+- 📦 No quality loss
+- 💾 No re-encoding required
 
----
+### Re-encode Mode
+When clips have different formats, the app re-encodes using the detected GPU encoder with:
+- Optimized presets for each encoder type
+- Quality settings (CRF 23-30 depending on encoder)
+- AAC audio at 128kbps
 
-**Happy cutting!**
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| "Chrome not found" | Install Chrome, or modify `mode="chrome"` to `mode=None` in `main.py` |
+| FFmpeg not found | Ensure FFmpeg is in PATH: run `ffmpeg -version` to verify |
+| No GPU acceleration | App falls back to CPU encoding automatically |
+| Tkinter errors (Linux) | Install: `sudo apt install python3-tk` |
+| Export fails | Check console for FFmpeg error messages |
+
+## Configuration
+
+### Changing Default Window Size
+
+In `main.py`, modify the `eel.start()` call:
+```python
+eel.start("index.html", size=(1380, 900), ...)
+```
+
+### Changing Browser Mode
+
+```python
+# Use default browser instead of Chrome
+eel.start("index.html", mode=None, ...)
+
+# Use Edge
+eel.start("index.html", mode="edge", ...)
+```
+
+## License
+
+MIT License - Feel free to use, modify, and distribute.
+
+## Acknowledgments
+
+- [Eel](https://github.com/python-eel/Eel) – Python library for creating desktop apps with web UI
+- [FFmpeg](https://ffmpeg.org/) – Multimedia processing framework
