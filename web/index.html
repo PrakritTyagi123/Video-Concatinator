@@ -1,77 +1,136 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>🎬 Video Timeline Editor</title>
-<link rel="stylesheet" href="styles.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Video Timeline Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="container">
 
-    <div class="header">
-        <div class="theme‑toggle">
-            <input type="checkbox" id="themeSwitch" />
-            <label for="themeSwitch" title="Toggle light / dark">🌙</label>
-        </div>
-
-        <h1>🎬 Video Timeline Editor</h1>
-        <p>Create multiple video timelines and export them with custom names</p>
-        <div id="systemInfo" class="system-info"></div>
+<div class="app" id="app">
+  <!-- Nav Rail -->
+  <nav class="rail">
+    <div class="rail-top">
+      <button class="rail-btn active" data-page="editor" title="Editor (Alt+1)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="M9.5 8.5l6 3.5-6 3.5V8.5z"/></svg>
+      </button>
+      <button class="rail-btn" data-page="history" title="Export History (Alt+2)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      </button>
     </div>
-
-    <div class="main-content">
-        <!-- ---------- SIDEBAR ---------- -->
-        <div class="sidebar">
-            <div class="section-title">📁 Video Library</div>
-
-            <button class="browse-btn" onclick="selectSource()">📂 Select Source Folder</button>
-            <p id="srcLabel" class="path-label">None selected</p>
-
-            <div class="video-list" id="videoList">
-                <div class="empty-state">Click "Select Source Folder" to load video files</div>
-            </div>
-
-            <div class="section-title" style="margin-top:20px;">⚙️ Export Settings</div>
-
-            <button class="browse-btn" onclick="selectDestination()">📁 Select Destination Folder</button>
-            <p id="dstLabel" class="path-label">None selected</p>
-
-            <button class="export-btn" id="exportBtn" onclick="exportTimelines()">🚀 Export All Timelines</button>
-
-            <div class="progress-bar" id="progressBar">
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
-            <p id="progressText" class="progress-info"></p>
-            <p id="etaText" class="progress-info eta"></p>
-
-            <div class="status-message" id="statusMessage"></div>
-        </div>
-
-        <!-- ---------- MAIN PANEL ---------- -->
-        <div class="main-panel">
-            <div class="section-title">🎞️ Video Timelines</div>
-            <button class="add-timeline-btn" onclick="addTimeline()">➕ Add New Timeline</button>
-
-            <div id="timelinesContainer">
-                <div class="empty-state">Click "Add New Timeline" to create your first video timeline</div>
-            </div>
-        </div>
+    <div class="rail-bottom">
+      <button class="rail-btn" id="accentBtn" title="Accent color">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+      </button>
+      <input type="color" id="accentPicker" value="#3b82f6" style="position:absolute;opacity:0;width:0;height:0">
+      <button class="rail-btn" id="fullscreenBtn" title="Fullscreen (F11)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8V5a2 2 0 012-2h3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M8 21H5a2 2 0 01-2-2v-3"/></svg>
+      </button>
+      <button class="rail-btn" id="themeToggle" title="Toggle theme">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      </button>
     </div>
+  </nav>
+
+  <!-- ═══ EDITOR PAGE ═══ -->
+  <div class="page page-editor active" id="pageEditor">
+    <!-- Sidebar (resizable) -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sb-top">
+        <div class="sb-label">Video Library</div>
+        <button class="sb-btn" onclick="selectSource()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l4-4h6l2 4h6v14H3V7z"/></svg>
+          Open folder
+        </button>
+        <div class="path-label" id="srcLabel">No folder selected</div>
+        <div class="loading-bar" id="loadingBar"><div class="loading-fill" id="loadingFill"></div></div>
+      </div>
+      <div class="video-list" id="videoList"
+           ondragover="handleExplorerDragOver(event)"
+           ondrop="handleExplorerDrop(event)">
+        <div class="empty-hint">Select a folder or drop video files here</div>
+      </div>
+      <div class="sb-bottom">
+        <div class="sb-label">Export Settings</div>
+        <button class="sb-btn" onclick="selectDestination()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l4-4h6l2 4h6v14H3V7z"/></svg>
+          Destination folder
+        </button>
+        <div class="path-label" id="dstLabel">No folder selected</div>
+        <div class="export-row">
+          <select id="fmtSelect"><option value="mkv">MKV</option><option value="mp4">MP4</option><option value="webm">WebM</option></select>
+          <select id="qualitySelect"><option value="high">High</option><option value="medium">Medium</option><option value="fast">Fast</option></select>
+        </div>
+        <button class="export-btn" id="exportBtn" onclick="exportTimelines()">Export all timelines</button>
+      </div>
+      <!-- Resize handle -->
+      <div class="sidebar-resize" id="sidebarResize"></div>
+    </aside>
+
+    <!-- Main panel -->
+    <main class="main">
+      <header class="main-header">
+        <div class="header-left">
+          <span class="header-title">Timelines</span>
+          <span class="encoder-badge" id="encoderBadge">detecting…</span>
+        </div>
+        <div class="header-right">
+          <button class="preview-btn" onclick="previewTimeline()" title="Preview current timeline">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>
+            Preview
+          </button>
+          <button class="add-tl-btn" onclick="addTimeline()">+ Add timeline</button>
+        </div>
+      </header>
+      <div class="timelines-scroll" id="timelinesContainer">
+        <div class="empty-hint">Click "+ Add timeline" to get started</div>
+      </div>
+      <div class="toast" id="toast"></div>
+      <div class="progress-bar" id="progressBar">
+        <span class="prog-label" id="progLabel"></span>
+        <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+        <span class="prog-pct" id="progPct"></span>
+        <span class="prog-eta" id="progEta"></span>
+      </div>
+    </main>
+  </div>
+
+  <!-- ═══ HISTORY PAGE ═══ -->
+  <div class="page page-history" id="pageHistory">
+    <div class="history-content">
+      <h2>Export History</h2>
+      <p class="history-sub">Results from your export sessions</p>
+      <div id="historyList" class="history-list"><div class="empty-hint">No exports yet</div></div>
+    </div>
+  </div>
 </div>
+
+<!-- ═══ VIDEO PLAYER MODAL ═══ -->
+<div class="player-overlay" id="playerOverlay" onclick="closePlayer(event)">
+  <div class="player-modal" onclick="event.stopPropagation()">
+    <div class="player-header">
+      <span class="player-title" id="playerTitle">Video Preview</span>
+      <div class="player-controls">
+        <button class="player-detach" onclick="detachPlayer()" title="Open in new window">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+        </button>
+        <button class="player-close" onclick="closePlayer()">✕</button>
+      </div>
+    </div>
+    <video id="videoPlayer" controls preload="metadata"></video>
+    <div class="player-info" id="playerInfo"></div>
+  </div>
+</div>
+
+<!-- Notification sound (base64 embedded tiny beep) -->
+<audio id="notifSound" preload="auto">
+  <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=" type="audio/wav">
+</audio>
 
 <script src="/eel.js"></script>
 <script src="app.js"></script>
-<script>
-// Display system info on load
-window.addEventListener("load", () => {
-    eel.get_system_info()((info) => {
-        const systemInfo = document.getElementById('systemInfo');
-        const icon = info.gpu_acceleration ? '🎮' : '💻';
-        systemInfo.innerHTML = `${icon} ${info.encoder_name}`;
-        systemInfo.className = 'system-info ' + (info.gpu_acceleration ? 'gpu-enabled' : 'cpu-mode');
-    });
-});
-</script>
 </body>
 </html>
