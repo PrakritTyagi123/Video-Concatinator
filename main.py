@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """
-Video Timeline Editor v2.1
-Features:
-  - GPU encoder auto-detection (NVENC, QSV, AMF, VT, CPU fallback)
-  - Parallel thumbnail extraction (threaded)
-  - Background probing (doesn't freeze UI)
-  - Lossless concat for same-codec, re-encode only when needed
-  - Wall-clock ETA, per-timeline error reporting
-  - Fixed: audio streams in filter, codec-based reencode, safe filenames
+Video Timeline Editor v2.2
+- Video streaming endpoint for preview playback
+- GPU encoder auto-detection
+- Parallel thumbnail extraction
+- Background probing
+- Lossless concat / GPU re-encode
 """
 
 import os, json, math, subprocess, tempfile, time, tkinter as tk, warnings, re, hashlib, base64
@@ -22,6 +20,7 @@ VIDEO_EXT = (".mp4", ".mov", ".mkv", ".avi", ".flv", ".webm", ".ts", ".m4v")
 UNSAFE_CHARS = re.compile(r'[<>:"/\\|?*]')
 THUMB_DIR = os.path.join(os.path.expanduser("~"), ".videotimeline", "thumbs")
 os.makedirs(THUMB_DIR, exist_ok=True)
+
 
 # ─── GPU / Codec Detection ───────────────────────────────────────────────────
 
@@ -42,8 +41,7 @@ def detect_gpu_encoder() -> tuple[str, str]:
             if r.returncode == 0:
                 print(f"✅ Encoder: {name} ({enc})")
                 return enc, name
-        except Exception:
-            continue
+        except Exception: continue
     return "libx264", "CPU H.264"
 
 GPU_ENCODER, ENCODER_NAME = detect_gpu_encoder()
@@ -87,7 +85,7 @@ def _fmt_size(b):
 
 def _safe_fn(n): return UNSAFE_CHARS.sub("_", n).strip()
 
-# ─── Thumbnail (single file) ─────────────────────────────────────────────────
+# ─── Thumbnail ───────────────────────────────────────────────────────────────
 
 def _extract_thumb(video_path):
     h = hashlib.md5(video_path.encode()).hexdigest()[:12]
@@ -107,24 +105,19 @@ def _extract_thumb(video_path):
         print(f"⚠️ Thumb: {os.path.basename(video_path)}: {e}")
     return None
 
-# ─── Probe single file (for parallel use) ────────────────────────────────────
+# ─── Probe single file (parallel) ────────────────────────────────────────────
 
 def _probe_file(fp):
-    """Probe one video file completely. Returns dict. Thread-safe."""
     fn = os.path.basename(fp)
     dur = _probe_duration(fp)
     codec = _probe_codec(fp)
     res = _probe_resolution(fp)
     thumb = _extract_thumb(fp)
     return {
-        "name": fn,
-        "path": fp.replace("\\", "/"),
+        "name": fn, "path": fp.replace("\\","/"),
         "size": _fmt_size(os.path.getsize(fp)),
-        "duration": dur,
-        "durationText": _fmt_dur(dur),
-        "codec": codec,
-        "resolution": res,
-        "thumbnail": thumb,
+        "duration": dur, "durationText": _fmt_dur(dur),
+        "codec": codec, "resolution": res, "thumbnail": thumb,
     }
 
 # ─── Folder Pickers ──────────────────────────────────────────────────────────
@@ -137,36 +130,27 @@ def choose_source():
     if not folder: return None
 
     paths = sorted([
-        os.path.join(folder, fn)
-        for fn in os.listdir(folder)
+        os.path.join(folder, fn) for fn in os.listdir(folder)
         if fn.lower().endswith(VIDEO_EXT) and os.path.isfile(os.path.join(folder, fn))
     ])
+    if not paths: return {"path": folder, "files": []}
 
-    if not paths:
-        return {"path": folder, "files": []}
-
-    # Send file count immediately so UI can show loading state
     eel.source_loading(len(paths))
 
-    # Parallel probe + thumbnail extraction (4 workers)
     files = [None] * len(paths)
     with ThreadPoolExecutor(max_workers=4) as pool:
         futures = {pool.submit(_probe_file, p): i for i, p in enumerate(paths)}
         done = 0
         for future in as_completed(futures):
             idx = futures[future]
-            try:
-                files[idx] = future.result()
+            try: files[idx] = future.result()
             except Exception as e:
                 fn = os.path.basename(paths[idx])
-                files[idx] = {"name": fn, "path": paths[idx].replace("\\","/"),
-                              "size":"?", "duration":0, "durationText":"?",
-                              "codec":"?", "resolution":"?", "thumbnail": None}
-                print(f"⚠️ Probe failed: {fn}: {e}")
+                files[idx] = {"name":fn,"path":paths[idx].replace("\\","/"),
+                              "size":"?","duration":0,"durationText":"?",
+                              "codec":"?","resolution":"?","thumbnail":None,"streamUrl":""}
             done += 1
-            # Stream progress to frontend
-            eel.source_progress(done, len(paths), files[idx]["name"])
-
+            eel.source_progress(done, len(paths), files[idx]["name"] if files[idx] else "")
     print(f"📁 Loaded {len(files)} files from {folder}")
     return {"path": folder, "files": files}
 
@@ -197,8 +181,6 @@ def _run_ffmpeg(cmd, total_sec, tl_name):
         if proc.returncode != 0:
             raise RuntimeError(f"FFmpeg error ({proc.returncode}): {proc.stderr.read()[:500]}")
 
-# ─── Re-encode detection ─────────────────────────────────────────────────────
-
 def _needs_reencode(videos):
     codecs, ress = set(), set()
     for v in videos:
@@ -207,10 +189,7 @@ def _needs_reencode(videos):
         if r: ress.add(r)
     return len(codecs) > 1 or len(ress) > 1
 
-# ─── Export: lossless concat ─────────────────────────────────────────────────
-
 def _export_concat(tl, out_path):
-    print(f"📋 Lossless concat: {tl['name']}")
     with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".txt", encoding="utf-8") as f:
         for v in tl["videos"]:
             p = os.path.abspath(v["path"]).replace("\\","/").replace("'","'\\''")
@@ -219,15 +198,12 @@ def _export_concat(tl, out_path):
     total = sum(_probe_duration(v["path"]) for v in tl["videos"]) or 1.0
     try:
         _run_ffmpeg(["ffmpeg","-hide_banner","-loglevel","warning",
-                     "-f","concat","-safe","0","-i",lp,
-                     "-c","copy","-avoid_negative_ts","make_zero",
-                     "-progress","pipe:1","-y",out_path], total, tl["name"])
+                     "-f","concat","-safe","0","-i",lp,"-c","copy",
+                     "-avoid_negative_ts","make_zero","-progress","pipe:1","-y",out_path],
+                    total, tl["name"])
     finally: os.remove(lp)
 
-# ─── Export: re-encode ───────────────────────────────────────────────────────
-
 def _export_reencode(tl, out_path, encoder, quality):
-    print(f"🎮 Re-encode: {tl['name']} → {encoder}")
     inputs, filt = [], []
     for i, v in enumerate(tl["videos"]):
         inputs += ["-i", v["path"]]
@@ -241,12 +217,9 @@ def _export_reencode(tl, out_path, encoder, quality):
     elif any(x in encoder for x in ("nvenc","amf","qsv")):
         cmd += ["-preset","p4","-rc","vbr","-b:v","8M","-maxrate","12M"]
     else:
-        sp = {"high":"medium","medium":"fast","fast":"ultrafast"}.get(quality,"fast")
-        cmd += ["-preset",sp,"-crf",str(crf)]
+        cmd += ["-preset",{"high":"medium","medium":"fast","fast":"ultrafast"}.get(quality,"fast"),"-crf",str(crf)]
     cmd += ["-c:a","aac","-b:a","128k","-progress","pipe:1","-y",out_path]
     _run_ffmpeg(cmd, total, tl["name"])
-
-# ─── Main export ─────────────────────────────────────────────────────────────
 
 @eel.expose
 def export_timelines(timelines_json, output_dir, fmt="mkv", quality="high"):
@@ -261,8 +234,8 @@ def export_timelines(timelines_json, output_dir, fmt="mkv", quality="high"):
         eel.start_timeline(tl["name"])
         op = os.path.join(output_dir, _safe_fn(tl["name"]) + ext)
         try:
-            (_export_reencode if _needs_reencode(tl["videos"]) else _export_concat)(
-                tl, op, GPU_ENCODER, quality) if _needs_reencode(tl["videos"]) else _export_concat(tl, op)
+            if _needs_reencode(tl["videos"]): _export_reencode(tl, op, GPU_ENCODER, quality)
+            else: _export_concat(tl, op)
             eel.update_progress(100.0, tl["name"], 0)
             sz = os.path.getsize(op) if os.path.exists(op) else 0
             results.append({"name":tl["name"],"ok":True,"size":_fmt_size(sz)})
@@ -278,9 +251,7 @@ def get_system_info():
     return {"encoder":GPU_ENCODER,"encoder_name":ENCODER_NAME,
             "gpu_acceleration":GPU_ENCODER not in {"libx264","libaom-av1"}}
 
-# ─── Entry ───────────────────────────────────────────────────────────────────
-
 if __name__ == "__main__":
-    print("🎬 Video Timeline Editor v2.1")
+    print("🎬 Video Timeline Editor v2.2")
     print(f"🖥️  Encoder → {ENCODER_NAME} ({GPU_ENCODER})")
     eel.start("index.html", size=(1400, 900), mode="chrome" if os.name == "nt" else None)

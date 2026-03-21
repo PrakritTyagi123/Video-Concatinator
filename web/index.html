@@ -78,10 +78,6 @@
           <span class="encoder-badge" id="encoderBadge">detecting…</span>
         </div>
         <div class="header-right">
-          <button class="preview-btn" onclick="previewTimeline()" title="Preview current timeline">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>
-            Preview
-          </button>
           <button class="add-tl-btn" onclick="addTimeline()">+ Add timeline</button>
         </div>
       </header>
@@ -108,24 +104,7 @@
   </div>
 </div>
 
-<!-- ═══ VIDEO PLAYER MODAL ═══ -->
-<div class="player-overlay" id="playerOverlay" onclick="closePlayer(event)">
-  <div class="player-modal" onclick="event.stopPropagation()">
-    <div class="player-header">
-      <span class="player-title" id="playerTitle">Video Preview</span>
-      <div class="player-controls">
-        <button class="player-detach" onclick="detachPlayer()" title="Open in new window">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
-        </button>
-        <button class="player-close" onclick="closePlayer()">✕</button>
-      </div>
-    </div>
-    <video id="videoPlayer" controls preload="metadata"></video>
-    <div class="player-info" id="playerInfo"></div>
-  </div>
-</div>
-
-<!-- Notification sound (base64 embedded tiny beep) -->
+<!-- Notification sound -->
 <audio id="notifSound" preload="auto">
   <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=" type="audio/wav">
 </audio>
