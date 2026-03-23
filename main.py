@@ -1,20 +1,27 @@
 #!/usr/bin/env python3
 """
-Video Timeline Editor v2.2
-- Video streaming endpoint for preview playback
-- GPU encoder auto-detection
+Video Timeline Editor v2.3
+- GPU encoder auto-detection (NVENC, QSV, AMF, VT, CPU fallback)
 - Parallel thumbnail extraction
 - Background probing
 - Lossless concat / GPU re-encode
+- PyInstaller compatible
 """
 
-import os, json, math, subprocess, tempfile, time, tkinter as tk, warnings, re, hashlib, base64
+import os, sys, json, math, subprocess, tempfile, time, tkinter as tk, warnings, re, hashlib, base64
 from tkinter import filedialog
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import eel
 
 warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
-eel.init("web", allowed_extensions=[".js", ".html", ".css", ".jpg", ".jpeg", ".png", ".wav", ".mp3"])
+
+# PyInstaller extracts to a temp dir -- sys._MEIPASS points there
+if getattr(sys, 'frozen', False):
+    BASE_DIR = sys._MEIPASS
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+eel.init(os.path.join(BASE_DIR, "web"), allowed_extensions=[".js", ".html", ".css", ".jpg", ".jpeg", ".png", ".wav", ".mp3"])
 
 VIDEO_EXT = (".mp4", ".mov", ".mkv", ".avi", ".flv", ".webm", ".ts", ".m4v")
 UNSAFE_CHARS = re.compile(r'[<>:"/\\|?*]')
@@ -22,7 +29,7 @@ THUMB_DIR = os.path.join(os.path.expanduser("~"), ".videotimeline", "thumbs")
 os.makedirs(THUMB_DIR, exist_ok=True)
 
 
-# ─── GPU / Codec Detection ───────────────────────────────────────────────────
+# --- GPU / Codec Detection ---------------------------------------------------
 
 def detect_gpu_encoder() -> tuple[str, str]:
     encoders = [
@@ -39,14 +46,14 @@ def detect_gpu_encoder() -> tuple[str, str]:
                  "-c:v",enc,"-t","0.1","-f","null","-"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
             if r.returncode == 0:
-                print(f"✅ Encoder: {name} ({enc})")
+                print(f"[OK] Encoder: {name} ({enc})")
                 return enc, name
         except Exception: continue
     return "libx264", "CPU H.264"
 
 GPU_ENCODER, ENCODER_NAME = detect_gpu_encoder()
 
-# ─── Probing ─────────────────────────────────────────────────────────────────
+# --- Probing ------------------------------------------------------------------
 
 def _probe_duration(path):
     try:
@@ -85,7 +92,7 @@ def _fmt_size(b):
 
 def _safe_fn(n): return UNSAFE_CHARS.sub("_", n).strip()
 
-# ─── Thumbnail ───────────────────────────────────────────────────────────────
+# --- Thumbnail ----------------------------------------------------------------
 
 def _extract_thumb(video_path):
     h = hashlib.md5(video_path.encode()).hexdigest()[:12]
@@ -102,10 +109,10 @@ def _extract_thumb(video_path):
         if os.path.exists(tp) and os.path.getsize(tp) > 100:
             with open(tp,"rb") as f: return f"data:image/jpeg;base64,{base64.b64encode(f.read()).decode()}"
     except Exception as e:
-        print(f"⚠️ Thumb: {os.path.basename(video_path)}: {e}")
+        print(f"[WARN] Thumb failed: {os.path.basename(video_path)}: {e}")
     return None
 
-# ─── Probe single file (parallel) ────────────────────────────────────────────
+# --- Probe single file (parallel) --------------------------------------------
 
 def _probe_file(fp):
     fn = os.path.basename(fp)
@@ -120,7 +127,7 @@ def _probe_file(fp):
         "codec": codec, "resolution": res, "thumbnail": thumb,
     }
 
-# ─── Folder Pickers ──────────────────────────────────────────────────────────
+# --- Folder Pickers ----------------------------------------------------------
 
 @eel.expose
 def choose_source():
@@ -148,10 +155,10 @@ def choose_source():
                 fn = os.path.basename(paths[idx])
                 files[idx] = {"name":fn,"path":paths[idx].replace("\\","/"),
                               "size":"?","duration":0,"durationText":"?",
-                              "codec":"?","resolution":"?","thumbnail":None,"streamUrl":""}
+                              "codec":"?","resolution":"?","thumbnail":None}
             done += 1
             eel.source_progress(done, len(paths), files[idx]["name"] if files[idx] else "")
-    print(f"📁 Loaded {len(files)} files from {folder}")
+    print(f"Loaded {len(files)} files from {folder}")
     return {"path": folder, "files": files}
 
 @eel.expose
@@ -161,10 +168,10 @@ def choose_destination():
     root.destroy()
     return folder or None
 
-# ─── FFmpeg runner ───────────────────────────────────────────────────────────
+# --- FFmpeg runner ------------------------------------------------------------
 
 def _run_ffmpeg(cmd, total_sec, tl_name):
-    print("🔧 " + " ".join(cmd))
+    print("[CMD] " + " ".join(cmd))
     start = time.monotonic()
     with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                           text=True, errors="replace") as proc:
@@ -190,6 +197,7 @@ def _needs_reencode(videos):
     return len(codecs) > 1 or len(ress) > 1
 
 def _export_concat(tl, out_path):
+    print(f"[CONCAT] Lossless: {tl['name']}")
     with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".txt", encoding="utf-8") as f:
         for v in tl["videos"]:
             p = os.path.abspath(v["path"]).replace("\\","/").replace("'","'\\''")
@@ -204,6 +212,7 @@ def _export_concat(tl, out_path):
     finally: os.remove(lp)
 
 def _export_reencode(tl, out_path, encoder, quality):
+    print(f"[ENCODE] Re-encoding: {tl['name']} with {encoder}")
     inputs, filt = [], []
     for i, v in enumerate(tl["videos"]):
         inputs += ["-i", v["path"]]
@@ -240,7 +249,7 @@ def export_timelines(timelines_json, output_dir, fmt="mkv", quality="high"):
             sz = os.path.getsize(op) if os.path.exists(op) else 0
             results.append({"name":tl["name"],"ok":True,"size":_fmt_size(sz)})
         except Exception as e:
-            print(f"❌ {tl['name']}: {e}")
+            print(f"[ERR] {tl['name']}: {e}")
             eel.timeline_error(tl["name"], str(e))
             results.append({"name":tl["name"],"ok":False,"error":str(e)})
     ok = sum(1 for r in results if r["ok"])
@@ -252,6 +261,17 @@ def get_system_info():
             "gpu_acceleration":GPU_ENCODER not in {"libx264","libaom-av1"}}
 
 if __name__ == "__main__":
-    print("🎬 Video Timeline Editor v2.2")
-    print(f"🖥️  Encoder → {ENCODER_NAME} ({GPU_ENCODER})")
-    eel.start("index.html", size=(1400, 900), mode="chrome" if os.name == "nt" else None)
+    # When running as --noconsole exe, stdout/stderr may be None
+    if getattr(sys, 'frozen', False):
+        if sys.stdout is None: sys.stdout = open(os.devnull, 'w')
+        if sys.stderr is None: sys.stderr = open(os.devnull, 'w')
+
+    print("Video Timeline Editor v2.3")
+    print(f"Encoder: {ENCODER_NAME} ({GPU_ENCODER})")
+
+    try:
+        eel.start("index.html", size=(1400, 900),
+                  mode="chrome" if os.name == "nt" else None,
+                  close_callback=lambda *_: sys.exit(0))
+    except (SystemExit, KeyboardInterrupt):
+        pass
